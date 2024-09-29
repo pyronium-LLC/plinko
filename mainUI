@@ -8,7 +8,7 @@ local submitButton = script.Parent.Main.Frame.Submit0.Submit.ImageButton
 local halfButton = script.Parent.Main.Frame.Bet.Inbox.Buttons.Half.Button
 local twoButton = script.Parent.Main.Frame.Bet.Inbox.Buttons.Two.Button
 local autoButton = script.Parent.Main.Frame.Submit0.Auto.ImageButton
-
+print("hello world")
 local autoButtonBackground = script.Parent.Main.Frame.Submit0.Auto
 local autoButtonFrame = script.Parent.Main.Frame.Submit0.Auto.Frame.Frame
 
