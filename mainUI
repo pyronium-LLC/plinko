@@ -1,0 +1,200 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local BallSpawnEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("Dropped")
+local SoundService = game:GetService("SoundService")
+local player = game.Players.LocalPlayer
+
+local textbox = script.Parent.Main.Frame.Bet.Inbox.Amount.Textbox
+local submitButton = script.Parent.Main.Frame.Submit0.Submit.ImageButton
+local halfButton = script.Parent.Main.Frame.Bet.Inbox.Buttons.Half.Button
+local twoButton = script.Parent.Main.Frame.Bet.Inbox.Buttons.Two.Button
+local autoButton = script.Parent.Main.Frame.Submit0.Auto.ImageButton
+
+local autoButtonBackground = script.Parent.Main.Frame.Submit0.Auto
+local autoButtonFrame = script.Parent.Main.Frame.Submit0.Auto.Frame.Frame
+
+local NotificationModule = require(ReplicatedStorage.Modules.Notification)
+
+local cooldownDuration = 0.2
+local submitCooldown = 0.08
+local autoToggleCooldown = 0.5
+local lastHalfButtonClick = 0
+local lastTwoButtonClick = 0
+local lastSubmitButtonClick = 0
+local lastAutoToggleClick = 0
+
+local autoSubmitEnabled = false
+local autoSubmitTask = nil
+
+local function playClickSound()
+	local sound = Instance.new("Sound")
+	sound.SoundId = "rbxassetid://410814187"
+	sound.Volume = 0.4
+	sound.Parent = SoundService
+	sound:Play()
+	sound.Ended:Connect(function()
+		sound:Destroy()
+	end)
+end
+
+local function formatNumberWithCommas(number)
+	local formatted = tostring(number)
+	while true do
+		formatted, k = formatted:gsub("^(%d+)(%d%d%d)", "%1,%2")
+		if k == 0 then
+			break
+		end
+	end
+	return formatted
+end
+
+local function updateTextboxWithCommas()
+	local amountText = textbox.Text:gsub(",", "")
+	local amount = tonumber(amountText)
+
+	if amount then
+		textbox.Text = formatNumberWithCommas(amount)
+	end
+
+	
+	if not amount or amount < 150 then
+		submitButton.BackgroundColor3 = Color3.new(0.5, 0.5, 0.5) 
+		submitButton.Active = false 
+	else
+		submitButton.BackgroundColor3 = Color3.new(1, 1, 1) 
+		submitButton.Active = true 
+	end
+end
+
+local function onSubmitButtonClicked()
+	local now = tick()
+	if now - lastSubmitButtonClick < submitCooldown then
+		return 
+	end
+	lastSubmitButtonClick = now
+
+	if tick() - lastHalfButtonClick < cooldownDuration or tick() - lastTwoButtonClick < cooldownDuration then
+		return 
+	end
+
+	local amountText = textbox.Text:gsub(",", "") 
+	local amount = tonumber(amountText)
+
+	if not amount or amount < 150 then
+		
+		local message = "At least 150 required to drop."
+		NotificationModule:ShowNotification(player, message, {
+			duration = 2,
+			type = "info",
+			soundId = "rbxassetid://6647898215"
+		})
+		return
+	end
+
+	playClickSound()
+
+	local gemsValue = player:FindFirstChild("leaderstats"):FindFirstChild("Gems")
+	if not gemsValue then
+		return
+	end
+
+	local currentBalance = gemsValue.Value
+
+	if currentBalance < amount then
+		local message = "Insufficient Gems."
+		NotificationModule:ShowNotification(player, message, {
+			duration = 2,
+			type = "info",
+			soundId = "rbxassetid://6647898215"
+		})
+		return
+	end
+
+	
+	gemsValue.Value = currentBalance - amount
+
+	
+	BallSpawnEvent:FireServer(amount)
+end
+
+local function onHalfButtonClicked()
+	local now = tick()
+	if now - lastHalfButtonClick < cooldownDuration then
+		return 
+	end
+
+	lastHalfButtonClick = now
+
+	playClickSound()
+
+	local amountText = textbox.Text:gsub(",", "") 
+	local amount = tonumber(amountText)
+
+	if not amount or amount <= 0 then
+		return
+	end
+
+	textbox.Text = formatNumberWithCommas(amount / 2)
+end
+
+local function onTwoButtonClicked()
+	local now = tick()
+	if now - lastTwoButtonClick < cooldownDuration then
+		return 
+	end
+
+	lastTwoButtonClick = now
+
+	playClickSound()
+
+	local amountText = textbox.Text:gsub(",", "") 
+	local amount = tonumber(amountText)
+
+	if not amount or amount <= 0 then
+		return
+	end
+
+	textbox.Text = formatNumberWithCommas(amount * 2)
+end
+
+local function toggleAutoSubmit()
+	local now = tick()
+	if now - lastAutoToggleClick < autoToggleCooldown then
+		return 
+	end
+
+	lastAutoToggleClick = now
+	autoSubmitEnabled = not autoSubmitEnabled
+
+	if autoSubmitEnabled then
+		
+		autoButtonBackground.BackgroundColor3 = Color3.fromRGB(20, 143, 38)
+		autoButtonFrame.BackgroundColor3 = Color3.fromRGB(29, 212, 57)
+
+		autoSubmitTask = task.spawn(function()
+			while autoSubmitEnabled do
+				onSubmitButtonClicked()
+				task.wait(submitCooldown + 0.5) 
+			end
+		end)
+	else
+		
+		autoButtonBackground.BackgroundColor3 = Color3.new(0.560784, 0.27451, 0.27451)
+		autoButtonFrame.BackgroundColor3 = Color3.new(0.831373, 0.258824, 0.258824)
+
+		
+		if autoSubmitTask then
+			task.cancel(autoSubmitTask)
+			autoSubmitTask = nil
+		end
+	end
+end
+
+
+textbox:GetPropertyChangedSignal("Text"):Connect(updateTextboxWithCommas)
+
+submitButton.MouseButton1Click:Connect(onSubmitButtonClicked)
+halfButton.MouseButton1Click:Connect(onHalfButtonClicked)
+twoButton.MouseButton1Click:Connect(onTwoButtonClicked)
+autoButton.MouseButton1Click:Connect(toggleAutoSubmit)
+
+print("MainUi - Loaded")
